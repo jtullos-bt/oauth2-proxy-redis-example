@@ -15,7 +15,7 @@ app.add_url_rule("/health", "health", view_func=lambda: health.run())
 
 
 @app.route("/", methods=["GET","POST"])
-def emailrequests_get():
+def root_get():
     return ("Hello World!", status.HTTP_200_OK)
 
 
