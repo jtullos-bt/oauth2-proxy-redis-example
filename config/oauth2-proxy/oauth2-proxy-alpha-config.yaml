@@ -1,0 +1,82 @@
+---
+injectRequestHeaders:
+  - name: Authorization
+    values:
+      - claim: access_token
+        prefix: "Bearer "
+  - name: X-Forwarded-Groups
+    values:
+      - claim: groups
+  - name: X-Forwarded-User
+    values:
+      - claim: user
+  - name: X-Forwarded-Email
+    values:
+      - claim: email
+  - name: X-Forwarded-Preferred-Username
+    values:
+      - claim: preferred_username
+  - name: X-Forwarded-Access-Token
+    values:
+      - claim: access_token
+
+injectResponseHeaders:
+  - name: X-Auth-Request-User
+    values:
+      - claim: user
+  - name: X-Auth-Request-Email
+    values:
+      - claim: email
+  - name: X-Auth-Request-Preferred-Username
+    values:
+      - claim: preferred_username
+  - name: X-Auth-Request-Groups
+    values:
+      - claim: groups
+  - name: X-Auth-Request-Access-Token
+    values:
+      - claim: access_token
+  - name: Authorization
+    values:
+      - claim: access_token
+        prefix: "Bearer "
+
+providers:
+  - id: MockProvider
+    name: MockProvider
+    provider: oidc
+    clientID: my-client
+    clientSecret: my-secret
+    code_challenge_method: S256
+    scope: "email openid offline_access"
+    loginURL: http://idp.localhost/
+    loginURLParameters:
+      - default:
+          - force
+        name: approval_prompt
+    oidcConfig:
+      audienceClaims:
+        - aud
+      emailClaim: email
+      groupsClaim: groups
+      insecureSkipNonce: true
+      issuerURL: http://idp.localhost/
+      skipDiscovery: false
+      userIDClaim: sub
+      insecureSkipIssuerVerification: true
+
+server:
+  BindAddress: 0.0.0.0:4180
+  SecureBindAddress: ""
+  TLS: null
+
+upstreamConfig:
+  upstreams:
+    - id: mock-oidc-server
+      uri: http://idp.localhost/
+      path: /
+      flushInterval: 1s
+      insecureSkipTLSVerify: true
+      passHostHeader: true
+      proxyWebSockets: true
+      timeout: 30s

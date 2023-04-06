@@ -1,0 +1,91 @@
+---
+version: '3.1'
+name: "o2p-redis-example"
+
+services:
+
+  reverse-proxy:
+    image: nginx:alpine
+    volumes:
+      - "./config/reverse-proxy/nginx.conf:/etc/nginx/nginx.conf"
+    ports:
+      - "80:80"
+    depends_on:
+      - hello-world-service
+    extra_hosts:
+      # Sometimes oauth2-proxy starts late and this reverse proxy uses the
+      # wrong host ip
+      - "oauth2-proxy:10.5.0.11"
+      - "hello-world-service:10.5.0.100"
+    networks:
+      o2p-redis-example-network:
+        # Be specific for reverse-proxy so other containers can use it in
+        # their extra-hosts section.
+        ipv4_address: 10.5.0.10
+
+  oauth2-proxy:
+    hostname: oauth2-proxy
+    image: quay.io/oauth2-proxy/oauth2-proxy
+    command:
+      - --config=/oauth2-proxy.cfg
+      - --alpha-config=/oauth2-proxy-alpha-config.yaml
+    volumes:
+      - "./config/oauth2-proxy/oauth2-proxy-alpha-config.yaml:/oauth2-proxy-alpha-config.yaml"
+      - "./config/oauth2-proxy/oauth2-proxy.cfg:/oauth2-proxy.cfg"
+    depends_on:
+      oauth2-proxy-redis:
+        condition: service_started
+      reverse-proxy:
+        condition: service_started
+    extra_hosts:
+      - "idp.localhost:10.5.0.10"
+    networks:
+      o2p-redis-example-network:
+        ipv4_address: 10.5.0.11
+
+  oauth2-proxy-redis:
+    hostname: oauth2-proxy-redis
+    image: redis:7-bullseye
+    volumes:
+      - oauth2-proxy-redis-cache:/data
+    networks:
+      o2p-redis-example-network:
+        ipv4_address: 10.5.0.12
+
+  mock-oidc-user-server:
+    hostname: mock-oidc-server
+    image: quay.io/appvia/mock-oidc-user-server:latest
+    environment:
+      - PORT=9090
+      - HOST=localhost
+      - CLIENT_ID=my-client
+      - CLIENT_SECRET=my-secret
+      - CLIENT_REDIRECT_URI=http://localhost:80/oauth2/callback
+      - CLIENT_LOGOUT_REDIRECT_URI=http://localhost
+    networks:
+      o2p-redis-example-network:
+        ipv4_address: 10.5.0.13
+    ports:
+      - 9090:9090
+
+  hello-world-service:
+    hostname: hello-world-service
+    build:
+      context: ./hello-world-service/
+    networks:
+      o2p-redis-example-network:
+        ipv4_address: 10.5.0.100
+    ports:
+      - 5000:5000
+
+volumes:
+  oauth2-proxy-redis-cache:
+    driver: local
+
+networks:
+  o2p-redis-example-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.5.0.0/16
+          gateway: 10.5.0.1
